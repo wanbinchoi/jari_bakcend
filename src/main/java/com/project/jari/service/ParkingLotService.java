@@ -1,4 +1,4 @@
 package com.project.jari.service;
 
-public class parkingLotService {
+public class ParkingLotService {
 }
