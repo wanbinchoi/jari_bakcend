@@ -9,20 +9,17 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "Fee")
-public class Fee {
+public class Location {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long fCode;
+    private long lcCode;
 
     @OneToOne
-    @JoinColumn(name = "Paring_lot")
+    @JoinColumn(name = "Parking_lot")
     private ParkingLot pkltCode;
 
-    private int prkCrg;
+    private String lat;
 
-    private int prkAmt;
-
-    private int prkHr;
+    private  String lot;
 
 }
