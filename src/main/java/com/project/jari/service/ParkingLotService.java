@@ -1,9 +1,10 @@
 package com.project.jari.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.project.jari.client.KakaoMapApiClient;
 import com.project.jari.client.ParkingApiClient;
+import com.project.jari.dto.ParkingLotDto;
+import com.project.jari.dto.response.GetParkingInfo;
 import com.project.jari.dto.response.ParkingLotInfo;
-import com.project.jari.dto.response.ParkingResponse;
 import com.project.jari.entity.ParkingLot;
 import com.project.jari.repository.ParkingLotRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,116 +12,127 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Slf4j
-@Transactional(readOnly = true)
 public class ParkingLotService {
 
-    private final ParkingApiClient parkingApiClient;
     private final ParkingLotRepository parkingLotRepository;
-    private final ObjectMapper objectMapper;
+    private final ParkingApiClient parkingApiClient;
+    private final KakaoMapApiClient kakaoMapApiClient;
+
+    // 서울시청 좌표 (폴백용)
+    private static final double DEFAULT_LATITUDE = 37.5665;
+    private static final double DEFAULT_LONGITUDE = 126.9780;
 
     /**
-     * 모든 주차장 조회 (DB에서)
-     */
-    public List<ParkingLot> findAll() {
-        return parkingLotRepository.findAll();
-    }
-
-    /**
-     * 주차장 코드로 조회
-     */
-    public ParkingLot findByCode(String pkltCode) {
-        return parkingLotRepository.findById(pkltCode)
-                .orElseThrow(() -> new IllegalArgumentException(
-                    "주차장을 찾을 수 없습니다: " + pkltCode));
-    }
-
-    /**
-     * 여러 주차장 코드로 조회
-     */
-    public List<ParkingLot> findByCodes(List<String> codes) {
-        return parkingLotRepository.findByPkltCodeIn(codes);
-    }
-
-    /**
-     * 이름으로 검색
-     */
-    public List<ParkingLot> searchByName(String keyword) {
-        return parkingLotRepository.findByNameContaining(keyword);
-    }
-
-    /**
-     * Open API에서 데이터 가져와서 DB에 저장
+     * 서울시 공영주차장 데이터 동기화
+     * Kakao Map API를 통해 주소를 좌표로 변환하여 저장
      */
     @Transactional
     public int syncParkingData() {
-        log.info("=== 주차장 데이터 동기화 시작 ===");
-        
+        log.info("주차장 데이터 동기화 시작");
+
+        int totalCount = 0;
+        int successCount = 0;
+        int coordinateSuccessCount = 0;
+        int coordinateFailCount = 0;
+
         try {
-            // 1. API 호출
-            String rawData = parkingApiClient.callPkApi();
-            ParkingResponse response = objectMapper.readValue(rawData, ParkingResponse.class);
-            
-            if (response == null || response.getGetParkingInfo() == null) {
-                log.error("API 응답 없음");
-                return 0;
-            }
-            
-            List<ParkingLotInfo> apiData = response.getGetParkingInfo().getRow();
-            
-            if (apiData == null || apiData.isEmpty()) {
-                log.warn("주차장 데이터 없음");
-                return 0;
-            }
-            
-            log.info("API 응답 수신: {}건", apiData.size());
-            
-            // 2. Entity로 변환
-            List<ParkingLot> entities = new ArrayList<>();
-            
-            for (ParkingLotInfo info : apiData) {
+            // 1. 서울시 API에서 주차장 데이터 가져오기
+            GetParkingInfo response = parkingApiClient.getParkingInfo();
+            List<ParkingLotInfo> parkingLots = response.getGetParkingInfo().getRow();
+            totalCount = parkingLots.size();
+
+            log.info("가져온 주차장 데이터: {}건", totalCount);
+
+            // 2. 각 주차장 데이터를 Entity로 변환하여 저장
+            for (ParkingLotInfo info : parkingLots) {
                 try {
-                    ParkingLot entity = convertToEntity(info);
-                    entities.add(entity);
+                    // 주소를 좌표로 변환
+                    String address = info.getADDR();
+                    Double[] coordinates = kakaoMapApiClient.convertAddressToCoordinates(address);
+
+                    ParkingLot parkingLot;
+
+                    if (coordinates != null && coordinates[0] != null && coordinates[1] != null) {
+                        // 좌표 변환 성공
+                        parkingLot = convertToEntity(info, coordinates[0], coordinates[1]);
+                        coordinateSuccessCount++;
+                        log.debug("좌표 변환 성공: {} -> 위도={}, 경도={}", 
+                            address, coordinates[0], coordinates[1]);
+                    } else {
+                        // 좌표 변환 실패 -> 기본 좌표 사용
+                        parkingLot = convertToEntity(info, DEFAULT_LATITUDE, DEFAULT_LONGITUDE);
+                        coordinateFailCount++;
+                        log.warn("좌표 변환 실패, 기본 좌표 사용: {}", address);
+                    }
+
+                    parkingLotRepository.save(parkingLot);
+                    successCount++;
+
+                    // API 호출 제한 고려: 약간의 지연 추가
+                    Thread.sleep(100); // 0.1초 대기
+
                 } catch (Exception e) {
-                    log.warn("주차장 변환 실패: {}, 에러: {}", 
-                        info.getPKLT_CD(), e.getMessage());
+                    log.error("주차장 데이터 저장 실패: {}", info.getPKLT_NM(), e);
                 }
             }
-            
-            // 3. DB에 저장
-            parkingLotRepository.saveAll(entities);
-            
-            log.info("주차장 데이터 동기화 완료: {}건", entities.size());
-            return entities.size();
-            
+
+            log.info("주차장 데이터 동기화 완료: 전체 {}건 중 {}건 성공 (좌표 변환: 성공 {}건, 실패 {}건)",
+                    totalCount, successCount, coordinateSuccessCount, coordinateFailCount);
+
         } catch (Exception e) {
-            log.error("주차장 데이터 동기화 실패", e);
-            throw new RuntimeException("데이터 동기화 실패", e);
+            log.error("주차장 데이터 동기화 중 오류 발생", e);
+            throw new RuntimeException("주차장 데이터 동기화 실패", e);
         }
+
+        // 결과 반환
+//        Map<String, Object> result = new HashMap<>();
+//        result.put("totalCount", totalCount);
+//        result.put("successCount", successCount);
+//        result.put("coordinateSuccessCount", coordinateSuccessCount);
+//        result.put("coordinateFailCount", coordinateFailCount);
+//        result.put("successRate", totalCount > 0 ?
+//            String.format("%.2f%%", (double) successCount / totalCount * 100) : "0.00%");
+//        result.put("coordinateSuccessRate", totalCount > 0 ?
+//            String.format("%.2f%%", (double) coordinateSuccessCount / totalCount * 100) : "0.00%");
+//
+//        return result;
+        return 1;
     }
 
     /**
-     * API 응답 → Entity 변환 (단순화 버전)
+     * ParkingLotInfo를 ParkingLot Entity로 변환
+     * 
+     * @param info 서울시 API 응답 데이터
+     * @param latitude Kakao API로 변환된 위도
+     * @param longitude Kakao API로 변환된 경도
+     * @return ParkingLot Entity
      */
-    private ParkingLot convertToEntity(ParkingLotInfo info) {
+    private ParkingLot convertToEntity(ParkingLotInfo info, Double latitude, Double longitude) {
         // 운영시간 JSON 생성
-        Map<String, Object> operationHours = createOperationHours(info);
-        
+        Map<String, Object> operationHours = new HashMap<>();
+        operationHours.put("weekday_start", info.getWD_OPER_BGNG_TM());
+        operationHours.put("weekday_end", info.getWD_OPER_END_TM());
+        operationHours.put("weekend_start", info.getWE_OPER_BGNG_TM());
+        operationHours.put("weekend_end", info.getWE_OPER_END_TM());
+        operationHours.put("holiday_start", info.getLHLDY_OPER_BGNG_TM());
+        operationHours.put("holiday_end", info.getLHLDY_OPER_END_TM());
+
         return ParkingLot.builder()
                 .pkltCode(info.getPKLT_CD())
                 .name(info.getPKLT_NM())
                 .address(info.getADDR())
-                .parkingType(info.getPRK_TYPE_NM())
+                .parkingType(info.getPKLT_TYPE())
                 .operationType(info.getOPER_SE_NM())
-                // TODO: Kakao API로 좌표 변환 필요
-                .latitude(37.5665)  // 임시 기본값 (서울시청)
-                .longitude(126.9780)
+                .latitude(latitude)
+                .longitude(longitude)
                 .totalCapacity(info.getTPKCT() != null ? info.getTPKCT().intValue() : 0)
                 .isPaid("Y".equals(info.getPAY_YN()))
                 .baseRate(info.getBSC_PRK_CRG() != null ? info.getBSC_PRK_CRG().intValue() : 0)
@@ -135,48 +147,40 @@ public class ParkingLotService {
     }
 
     /**
-     * 운영시간 JSON 생성
+     * 전체 주차장 조회
      */
-    private Map<String, Object> createOperationHours(ParkingLotInfo info) {
-        Map<String, Object> hours = new HashMap<>();
-        
-        // 평일
-        Map<String, String> weekday = new HashMap<>();
-        weekday.put("open", info.getWD_OPER_BGNG_TM() != null ? info.getWD_OPER_BGNG_TM() : "00:00");
-        weekday.put("close", info.getWD_OPER_END_TM() != null ? info.getWD_OPER_END_TM() : "24:00");
-        hours.put("weekday", weekday);
-        
-        // 주말
-        Map<String, String> weekend = new HashMap<>();
-        weekend.put("open", info.getWE_OPER_BGNG_TM() != null ? info.getWE_OPER_BGNG_TM() : "00:00");
-        weekend.put("close", info.getWE_OPER_END_TM() != null ? info.getWE_OPER_END_TM() : "24:00");
-        hours.put("weekend", weekend);
-        
-        // 공휴일
-        Map<String, String> holiday = new HashMap<>();
-        holiday.put("open", info.getLHLDY_OPER_BGNG_TM() != null ? info.getLHLDY_OPER_BGNG_TM() : "00:00");
-        holiday.put("close", info.getLHLDY_OPER_END_TM() != null ? info.getLHLDY_OPER_END_TM() : "24:00");
-        hours.put("holiday", holiday);
-        
-        // 무료 여부
-        hours.put("saturdayFree", "N".equals(info.getSAT_CHGD_FREE_SE()));
-        hours.put("holidayFree", "N".equals(info.getLHLDY_CHGD_FREE_SE()));
-        
-        return hours;
+    @Transactional(readOnly = true)
+    public List<ParkingLotDto> getAllParkingLots() {
+        return parkingLotRepository.findAll().stream()
+                .map(ParkingLotDto::from)
+                .collect(Collectors.toList());
     }
 
     /**
-     * API에서 직접 데이터 조회 (DB 저장 없이)
+     * 주차장 코드로 조회
      */
-    public List<ParkingLotInfo> getAllParkingLotsFromApi() throws IOException {
-        String rawData = parkingApiClient.callPkApi();
-        ParkingResponse response = objectMapper.readValue(rawData, ParkingResponse.class);
+    @Transactional(readOnly = true)
+    public ParkingLotDto getParkingLotByCode(String pkltCode) {
+        ParkingLot parkingLot = parkingLotRepository.findById(pkltCode)
+                .orElseThrow(() -> new RuntimeException("주차장을 찾을 수 없습니다: " + pkltCode));
+        return ParkingLotDto.from(parkingLot);
+    }
 
-        if (response.getGetParkingInfo() == null ||
-                response.getGetParkingInfo().getRow() == null) {
-            return Collections.emptyList();
+    /**
+     * 주차장 이름으로 검색
+     */
+    @Transactional(readOnly = true)
+    public List<ParkingLotDto> searchParkingLots(String keyword) {
+        List<ParkingLot> parkingLots;
+
+        if (keyword == null || keyword.trim().isEmpty()) {
+            parkingLots = parkingLotRepository.findAll();
+        } else {
+            parkingLots = parkingLotRepository.findByNameContaining(keyword);
         }
 
-        return response.getGetParkingInfo().getRow();
+        return parkingLots.stream()
+                .map(ParkingLotDto::from)
+                .collect(Collectors.toList());
     }
 }
