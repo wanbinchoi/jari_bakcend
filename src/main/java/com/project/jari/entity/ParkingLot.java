@@ -1,36 +1,128 @@
 package com.project.jari.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+import java.time.LocalDateTime;
+import java.util.Map;
+
+/**
+ * 주차장 기본 정보 엔티티 (단순화 버전)
+ * Location, Fee, Management, Operation 테이블을 통합한 단일 테이블
+ */
 @Entity
-@Data
-@NoArgsConstructor
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-@Table(name = "Parking_lot")
+@Builder
+@Table(name = "parking_lot", indexes = {
+        @Index(name = "idx_location", columnList = "latitude, longitude"),
+        @Index(name = "idx_name", columnList = "name")
+})
 public class ParkingLot {
+
+    // ===== pk =====
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long pkltCode;
+    @Column(name = "pklt_code", length = 20)
+    private String pkltCode;
 
-    private String pkltNm;
+    // ===== 기본 정보 =====
+    @Column(name = "name", length = 100, nullable = false)
+    private String name;
 
-    private String pkltAddr;
+    @Column(name = "address", length = 200, nullable = false)
+    private String address;
 
-    private String pkltKnd;
+    @Column(name = "parking_type", length = 20)
+    private String parkingType;
 
-    private String operSe;
+    @Column(name = "operation_type", length = 50)
+    private String operationType;
 
-    private int track;
+    // ===== 위치 정보 =====
+    @Column(name = "latitude", precision = 10, nullable = false)
+    private Double latitude;
 
-    private String payYn;
+    @Column(name = "longitude", precision = 11, nullable = false)
+    private Double longitude;
 
-    private String nightPayYn;
+    // ===== 주차 용량 =====
+    @Column(name = "total_capacity")
+    @Builder.Default
+    private Integer totalCapacity = 0;
 
-    private String satFreeSe;
+    // ===== 요금 정보 =====
+    @Column(name = "is_paid")
+    @Builder.Default
+    private Boolean isPaid = true;
 
-    private String lhldyFreeSe;
+    @Column(name = "base_rate")
+    @Builder.Default
+    private Integer baseRate = 0;
 
+    @Column(name = "base_time")
+    @Builder.Default
+    private Integer baseTime = 0;
+
+    @Column(name = "additional_rate")
+    @Builder.Default
+    private Integer additionalRate = 0;
+
+    @Column(name = "additional_time")
+    @Builder.Default
+    private Integer additionalTime = 0;
+
+    @Column(name = "day_max_rate")
+    @Builder.Default
+    private Integer dayMaxRate = 0;
+
+    // ===== 운영 시간 (JSON) =====
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "operation_hours", columnDefinition = "json")
+    private Map<String, Object> operationHours;
+
+    // ===== 기타 정보 =====
+    @Column(name = "tel", length = 20)
+    private String tel;
+
+    @Column(name = "is_shared")
+    @Builder.Default
+    private Boolean isShared = false;
+
+    // ===== 메타 정보 =====
+    @Column(name = "created_at", nullable = false, updatable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "updated_at")
+    @Builder.Default
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
+    // ===== 비즈니스 메서드 =====
+    
+    /**
+     * 정보 업데이트
+     */
+    public void updateInfo(String name, String address, Integer totalCapacity) {
+        this.name = name;
+        this.address = address;
+        this.totalCapacity = totalCapacity;
+        this.updatedAt = LocalDateTime.now();
+    }
+    
+    /**
+     * 위치 정보 업데이트
+     */
+    public void updateLocation(Double latitude, Double longitude) {
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }
