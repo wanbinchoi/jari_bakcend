@@ -25,8 +25,8 @@ dependencies {
 	// Spring Web (REST API 포함)
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 
-	// Spring Security
-	implementation 'org.springframework.boot:spring-boot-starter-security'
+	// Spring Security (사용 안함)
+	//implementation 'org.springframework.boot:spring-boot-starter-security'
 
 	// MySQL
 	implementation 'mysql:mysql-connector-java:8.0.33'
@@ -37,6 +37,7 @@ dependencies {
 
 	// Jackson (JSON 처리)
 	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'  // LocalDateTime 지원
 
 	// JPA
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -44,9 +45,20 @@ dependencies {
 	// open api를 react에서 사용하기 위한 의존성(webflux)
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
+	// Redis (추후에 사용할 예정)
+	//implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+	// Spring Cache
+	implementation 'org.springframework.boot:spring-boot-starter-cache'
+
+	// Caffeine 캐시 구현체
+	implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
+
 	// 테스트
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+
 }
 
 tasks.named('test') {
