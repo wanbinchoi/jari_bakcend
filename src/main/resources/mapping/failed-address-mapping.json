@@ -1,0 +1,50 @@
+{
+  "mappings": [
+    {
+      "originalAddress": "금천구 시흥동 139-2",
+      "correctAddress": "금천구 독산로50길 23",
+      "roadNameAddress": "금천구 독산로50길 23",
+      "latitude": 37.463664,
+      "longitude": 126.905963,
+      "verificationSource": "google_map",
+      "lastVerified": "2025-10-22",
+      "notes": "지번주소에서 도로명주소로 수동 변환"
+    },
+    {
+      "originalAddress": "중구 회현동1가 1-19",
+      "correctAddress": "중구 소파로 83",
+      "roadNameAddress": "중구 소파로 83",
+      "latitude": 37.557282,
+      "longitude": 126.984133,
+      "verificationSource": "google_map",
+      "lastVerified": "2025-10-22",
+      "notes": "구주소 형태에서 도로명주소로 변환"
+    },
+    {
+      "originalAddress": "중구 회현동1가 1-16",
+      "correctAddress": "중구 소파로 57",
+      "roadNameAddress": "중구 소파로 57",
+      "latitude": 37.555910,
+      "longitude": 126.983075,
+      "verificationSource": "google_map",
+      "lastVerified": "2025-10-22",
+      "notes": "구주소 형태에서 도로명주소로 변환"
+    },
+    {
+      "originalAddress": "노원구 상계동 111-568",
+      "correctAddress": "노원구 상계동 111-558",
+      "roadNameAddress": "노원구 상계동 111-558",
+      "latitude": 37.670905,
+      "longitude": 127.080432,
+      "verificationSource": "google_map",
+      "lastVerified": "2025-10-22",
+      "notes": "구주소 형태에서 도로명주소로 변환"
+    }
+  ],
+  "metadata": {
+    "version": "1.1",
+    "lastUpdated": "2025-10-22T15:30:00",
+    "totalMappings": 4,
+    "description": "API 변환에 실패한 주소들의 수동 매핑 테이블 (확장된 버전)"
+  }
+}

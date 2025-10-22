@@ -85,61 +85,98 @@ public class ParkingLotService {
     }
 
     /**
-     * @param info
-     * @param successCount
-     * @param failCount
-     * @return 실제 DB에 저장되는 ParkingLot엔티티가 Mono로 싸여서 반환되는 것임.
-     * 일단 개별 주차정 처리를 하는 메소드를 만들었음.
-     * @implNote 이 메소드는 서울시 api에서 주차장 데이터를 받아옴, 받아온 데이터에서 주소를 카카오맵 api를 통해서 좌표로 변환 후
-     * 완성된 ParkingLot엔티티를 DB에 저장시키는 역할
+     * 개별 주차장 처리 (비동기) - 매핑 시스템 통합
+     * 
+     * 처리 순서:
+     * 1. 매핑 테이블에서 좌표 확인
+     * 2. 매핑이 없으면 카카오 API 호출
+     * 3. 모든 방법 실패 시 기본 좌표 사용
+     * 
+     * 면접 포인트:
+     * - "다단계 fallback 전략을 구현하여 데이터 손실을 최소화했습니다"
+     * - "매핑 테이블을 우선 확인하여 API 호출 비용을 절약했습니다"
      */
-    // 개별 주차장 처리 (비동기)
     private Mono<ParkingLot> processParkingLotAsync(
             ParkingLotInfo info,
             AtomicInteger successCount,
-            AtomicInteger failCount) {
+            AtomicInteger failCount,
+            AtomicInteger mappingSuccessCount) {
 
-        // 주소 정제 후 지오코딩
         String rawAddress = info.getADDR();
         String cleansedAddress = addressCleanser.cleanseAddress(rawAddress);
 
-        return kakaoMapApiClient.convertAddressToCoordinatesAsync(cleansedAddress)  // 정제된 주소 사용
-                .delayElement(Duration.ofMillis(100))
-                .map(coordinates -> {
-                    ParkingLot parkingLot = convertToEntity(info, coordinates[0], coordinates[1]);
-                    ParkingLot saved = parkingLotRepository.save(parkingLot);
-                    successCount.incrementAndGet();
-
-                    log.debug("✅ 주차장 저장 완료: {} (주소: {})",
-                            info.getPKLT_NM(), cleansedAddress);
-
-                    return saved;
+        // 1단계: 매핑 테이블에서 좌표 확인
+        return Mono.fromCallable(() -> addressCleanser.findCoordinatesFromMapping(rawAddress))
+                .flatMap(mappingResult -> {
+                    if (mappingResult.isPresent()) {
+                        // 매핑에서 좌표 발견
+                        Double[] coordinates = mappingResult.get();
+                        log.info("🗂️ 매핑 테이블 사용: {} -> ({}, {})", 
+                            info.getPKLT_NM(), coordinates[0], coordinates[1]);
+                        
+                        ParkingLot parkingLot = convertToEntity(info, coordinates[0], coordinates[1]);
+                        ParkingLot saved = parkingLotRepository.save(parkingLot);
+                        mappingSuccessCount.incrementAndGet();
+                        successCount.incrementAndGet();
+                        
+                        return Mono.just(saved);
+                    } else {
+                        // 매핑에 없음 -> 카카오 API 호출
+                        return kakaoMapApiClient.convertAddressToCoordinatesAsync(cleansedAddress)
+                                .delayElement(Duration.ofMillis(100))
+                                .map(coordinates -> {
+                                    ParkingLot parkingLot = convertToEntity(info, coordinates[0], coordinates[1]);
+                                    ParkingLot saved = parkingLotRepository.save(parkingLot);
+                                    successCount.incrementAndGet();
+                                    
+                                    log.debug("✅ 카카오 API 성공: {} (주소: {})",
+                                            info.getPKLT_NM(), cleansedAddress);
+                                    
+                                    return saved;
+                                })
+                                .onErrorResume(apiError -> {
+                                    // 카카오 API도 실패 -> 기본 좌표 사용
+                                    log.warn("❌ 카카오 API 실패, 기본 좌표 사용: {} (주소: {})",
+                                            info.getPKLT_NM(), cleansedAddress);
+                                    
+                                    ParkingLot parkingLot = convertToEntity(info, DEFAULT_LATITUDE, DEFAULT_LONGITUDE);
+                                    ParkingLot saved = parkingLotRepository.save(parkingLot);
+                                    failCount.incrementAndGet();
+                                    
+                                    return Mono.just(saved);
+                                });
+                    }
                 })
                 .onErrorResume(error -> {
-                    log.error("❌ 주차장 처리 실패: {} (주소: {})",
-                            info.getPKLT_NM(), cleansedAddress, error);
+                    // 전체 프로세스 실패 -> 기본 좌표 사용
+                    log.error("❌ 전체 처리 실패: {} (주소: {})", 
+                            info.getPKLT_NM(), rawAddress, error);
+                    
                     ParkingLot parkingLot = convertToEntity(info, DEFAULT_LATITUDE, DEFAULT_LONGITUDE);
                     ParkingLot saved = parkingLotRepository.save(parkingLot);
                     failCount.incrementAndGet();
+                    
                     return Mono.just(saved);
                 });
     }
 
 
     /**
-     * @return 반환되는 값은 그냥 제대로 삽입되었나 확인할 수 있는 map반환
-     * @implNote 위에 processParkingLotAsync()는 서울시 api에서 받아온 주차장을 하나씩 갖고와서
-     * 카카오 api로 주소를 좌표로 변환해서 완성된 엔티티를 만드는 역할이었다면
-     * syncParkingDataParallel() 이 메소드는 그거를 10개씩 묶어서 실행함 (병렬처리, Flux)
-     * 따라서 실행시간이 확실히 줄어들음
+     * 병렬 주차장 데이터 동기화 (매핑 시스템 포함)
+     * 
+     * 면접 포인트:
+     * - "매핑 테이블 활용으로 API 호출 비용을 줄이고 처리 속도를 향상했습니다"
+     * - "병렬 처리로 대용량 데이터를 효율적으로 처리했습니다"
+     * - "상세한 통계 정보로 시스템 성능을 모니터링할 수 있습니다"
      */
     @Transactional
     public Mono<Map<String, Object>> syncParkingDataParallel() {
-        log.info("=== 병렬 주차장 데이터 동기화 시작 ===");
+        log.info("=== 매핑 시스템 포함 병렬 주차장 데이터 동기화 시작 ===");
         LocalDateTime startTime = LocalDateTime.now();
 
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failCount = new AtomicInteger(0);
+        AtomicInteger mappingSuccessCount = new AtomicInteger(0);  // 매핑 성공 카운트
 
         return Mono.fromCallable(() -> parkingApiClient.getParkingInfo())
                 .flatMapMany(parkingInfo -> {
@@ -147,24 +184,31 @@ public class ParkingLotService {
                     log.info("처리할 주차장 수: {}", parkingLots.size());
                     return Flux.fromIterable(parkingLots);
                 })
-                .flatMap(info -> processParkingLotAsync(info, successCount, failCount), 10)
+                .flatMap(info -> processParkingLotAsync(info, successCount, failCount, mappingSuccessCount), 10)
                 .collectList()
                 .map(results -> {
                     LocalDateTime endTime = LocalDateTime.now();
                     long processingTime = Duration.between(startTime, endTime).toSeconds();
+                    
+                    int apiCallCount = successCount.get() - mappingSuccessCount.get();
+                    double mappingUsageRate = results.size() > 0 ? 
+                        (mappingSuccessCount.get() * 100.0 / results.size()) : 0;
 
-                    // 반환되는 값 확인해보기 위해서
                     Map<String, Object> resultMap = new HashMap<>();
                     resultMap.put("status", "success");
-                    resultMap.put("message", "주차장 데이터 동기화 완료 (병렬 처리)");
+                    resultMap.put("message", "주차장 데이터 동기화 완료 (매핑 시스템 포함)");
                     resultMap.put("totalCount", results.size());
                     resultMap.put("successCount", successCount.get());
                     resultMap.put("failCount", failCount.get());
+                    resultMap.put("mappingSuccessCount", mappingSuccessCount.get());
+                    resultMap.put("apiCallCount", apiCallCount);
+                    resultMap.put("mappingUsageRate", String.format("%.1f%%", mappingUsageRate));
                     resultMap.put("processingTime", processingTime + "초");
                     resultMap.put("timestamp", endTime);
 
-                    log.info("=== 병렬 처리 완료: {}초, 성공: {}, 실패: {} ===",
-                            processingTime, successCount.get(), failCount.get());
+                    log.info("=== 처리 완료: {}초, 총: {}, 성공: {}, 실패: {}, 매핑 활용: {}건({}%) ===",
+                            processingTime, results.size(), successCount.get(), failCount.get(),
+                            mappingSuccessCount.get(), String.format("%.1f", mappingUsageRate));
 
                     return resultMap;
                 })
