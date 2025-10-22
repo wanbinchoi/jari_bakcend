@@ -3,18 +3,23 @@ package com.project.jari.service;
 import com.project.jari.client.KakaoMapApiClient;
 import com.project.jari.client.ParkingApiClient;
 import com.project.jari.dto.ParkingLotDto;
-import com.project.jari.dto.response.GetParkingInfo;
 import com.project.jari.dto.response.ParkingLotInfo;
 import com.project.jari.entity.ParkingLot;
 import com.project.jari.repository.ParkingLotRepository;
+import com.project.jari.util.AddressCleanser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -25,97 +30,30 @@ public class ParkingLotService {
     private final ParkingLotRepository parkingLotRepository;
     private final ParkingApiClient parkingApiClient;
     private final KakaoMapApiClient kakaoMapApiClient;
+    private final AddressCleanser addressCleanser;
 
     // 서울시청 좌표 (폴백용)
     private static final double DEFAULT_LATITUDE = 37.5665;
     private static final double DEFAULT_LONGITUDE = 126.9780;
 
     /**
-     * 서울시 공영주차장 데이터 동기화
-     * Kakao Map API를 통해 주소를 좌표로 변환하여 저장
-     */
-    @Transactional
-    public int syncParkingData() {
-        log.info("주차장 데이터 동기화 시작");
-
-        int totalCount = 0;
-        int successCount = 0;
-        int coordinateSuccessCount = 0;
-        int coordinateFailCount = 0;
-
-        try {
-            // 1. 서울시 API에서 주차장 데이터 가져오기
-            GetParkingInfo response = parkingApiClient.getParkingInfo();
-            List<ParkingLotInfo> parkingLots = response.getGetParkingInfo().getRow();
-            totalCount = parkingLots.size();
-
-            log.info("가져온 주차장 데이터: {}건", totalCount);
-
-            // 2. 각 주차장 데이터를 Entity로 변환하여 저장
-            for (ParkingLotInfo info : parkingLots) {
-                try {
-                    // 주소를 좌표로 변환
-                    String address = info.getADDR();
-                    Double[] coordinates = kakaoMapApiClient.convertAddressToCoordinates(address);
-
-                    ParkingLot parkingLot;
-
-                    if (coordinates != null && coordinates[0] != null && coordinates[1] != null) {
-                        // 좌표 변환 성공
-                        parkingLot = convertToEntity(info, coordinates[0], coordinates[1]);
-                        coordinateSuccessCount++;
-                        log.debug("좌표 변환 성공: {} -> 위도={}, 경도={}", 
-                            address, coordinates[0], coordinates[1]);
-                    } else {
-                        // 좌표 변환 실패 -> 기본 좌표 사용
-                        parkingLot = convertToEntity(info, DEFAULT_LATITUDE, DEFAULT_LONGITUDE);
-                        coordinateFailCount++;
-                        log.warn("좌표 변환 실패, 기본 좌표 사용: {}", address);
-                    }
-
-                    parkingLotRepository.save(parkingLot);
-                    successCount++;
-
-                    // API 호출 제한 고려: 약간의 지연 추가
-                    Thread.sleep(100); // 0.1초 대기
-
-                } catch (Exception e) {
-                    log.error("주차장 데이터 저장 실패: {}", info.getPKLT_NM(), e);
-                }
-            }
-
-            log.info("주차장 데이터 동기화 완료: 전체 {}건 중 {}건 성공 (좌표 변환: 성공 {}건, 실패 {}건)",
-                    totalCount, successCount, coordinateSuccessCount, coordinateFailCount);
-
-        } catch (Exception e) {
-            log.error("주차장 데이터 동기화 중 오류 발생", e);
-            throw new RuntimeException("주차장 데이터 동기화 실패", e);
-        }
-
-        // 결과 반환
-//        Map<String, Object> result = new HashMap<>();
-//        result.put("totalCount", totalCount);
-//        result.put("successCount", successCount);
-//        result.put("coordinateSuccessCount", coordinateSuccessCount);
-//        result.put("coordinateFailCount", coordinateFailCount);
-//        result.put("successRate", totalCount > 0 ?
-//            String.format("%.2f%%", (double) successCount / totalCount * 100) : "0.00%");
-//        result.put("coordinateSuccessRate", totalCount > 0 ?
-//            String.format("%.2f%%", (double) coordinateSuccessCount / totalCount * 100) : "0.00%");
-//
-//        return result;
-        return 1;
-    }
-
-    /**
      * ParkingLotInfo를 ParkingLot Entity로 변환
-     * 
+     *
      * @param info 서울시 API 응답 데이터
      * @param latitude Kakao API로 변환된 위도
      * @param longitude Kakao API로 변환된 경도
      * @return ParkingLot Entity
      */
     private ParkingLot convertToEntity(ParkingLotInfo info, Double latitude, Double longitude) {
+
+        String rawAddress = info.getADDR();
+        String cleansedAddress = addressCleanser.cleanseAddress(rawAddress);
+
+        // 변경 로깅
+        if (!rawAddress.equals(cleansedAddress)) {
+            log.info("주소 정제됨: '{}' -> '{}'", rawAddress, cleansedAddress);
+        }
+
         // 운영시간 JSON 생성
         Map<String, Object> operationHours = new HashMap<>();
         operationHours.put("weekday_start", info.getWD_OPER_BGNG_TM());
@@ -128,7 +66,7 @@ public class ParkingLotService {
         return ParkingLot.builder()
                 .pkltCode(info.getPKLT_CD())
                 .name(info.getPKLT_NM())
-                .address(info.getADDR())
+                .address(cleansedAddress)  // 정제된 주소 사용
                 .parkingType(info.getPKLT_TYPE())
                 .operationType(info.getOPER_SE_NM())
                 .latitude(latitude)
@@ -147,8 +85,92 @@ public class ParkingLotService {
     }
 
     /**
-     * 전체 주차장 조회
+     * @param info
+     * @param successCount
+     * @param failCount
+     * @return 실제 DB에 저장되는 ParkingLot엔티티가 Mono로 싸여서 반환되는 것임.
+     * 일단 개별 주차정 처리를 하는 메소드를 만들었음.
+     * @implNote 이 메소드는 서울시 api에서 주차장 데이터를 받아옴, 받아온 데이터에서 주소를 카카오맵 api를 통해서 좌표로 변환 후
+     * 완성된 ParkingLot엔티티를 DB에 저장시키는 역할
      */
+    // 개별 주차장 처리 (비동기)
+    private Mono<ParkingLot> processParkingLotAsync(
+            ParkingLotInfo info,
+            AtomicInteger successCount,
+            AtomicInteger failCount) {
+
+        // 주소 정제 후 지오코딩
+        String rawAddress = info.getADDR();
+        String cleansedAddress = addressCleanser.cleanseAddress(rawAddress);
+
+        return kakaoMapApiClient.convertAddressToCoordinatesAsync(cleansedAddress)  // 정제된 주소 사용
+                .delayElement(Duration.ofMillis(100))
+                .map(coordinates -> {
+                    ParkingLot parkingLot = convertToEntity(info, coordinates[0], coordinates[1]);
+                    ParkingLot saved = parkingLotRepository.save(parkingLot);
+                    successCount.incrementAndGet();
+
+                    log.debug("✅ 주차장 저장 완료: {} (주소: {})",
+                            info.getPKLT_NM(), cleansedAddress);
+
+                    return saved;
+                })
+                .onErrorResume(error -> {
+                    log.error("❌ 주차장 처리 실패: {} (주소: {})",
+                            info.getPKLT_NM(), cleansedAddress, error);
+                    ParkingLot parkingLot = convertToEntity(info, DEFAULT_LATITUDE, DEFAULT_LONGITUDE);
+                    ParkingLot saved = parkingLotRepository.save(parkingLot);
+                    failCount.incrementAndGet();
+                    return Mono.just(saved);
+                });
+    }
+
+
+    /**
+     * @return 반환되는 값은 그냥 제대로 삽입되었나 확인할 수 있는 map반환
+     * @implNote 위에 processParkingLotAsync()는 서울시 api에서 받아온 주차장을 하나씩 갖고와서
+     * 카카오 api로 주소를 좌표로 변환해서 완성된 엔티티를 만드는 역할이었다면
+     * syncParkingDataParallel() 이 메소드는 그거를 10개씩 묶어서 실행함 (병렬처리, Flux)
+     * 따라서 실행시간이 확실히 줄어들음
+     */
+    @Transactional
+    public Mono<Map<String, Object>> syncParkingDataParallel() {
+        log.info("=== 병렬 주차장 데이터 동기화 시작 ===");
+        LocalDateTime startTime = LocalDateTime.now();
+
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failCount = new AtomicInteger(0);
+
+        return Mono.fromCallable(() -> parkingApiClient.getParkingInfo())
+                .flatMapMany(parkingInfo -> {
+                    List<ParkingLotInfo> parkingLots = parkingInfo.getGetParkingInfo().getRow();
+                    log.info("처리할 주차장 수: {}", parkingLots.size());
+                    return Flux.fromIterable(parkingLots);
+                })
+                .flatMap(info -> processParkingLotAsync(info, successCount, failCount), 10)
+                .collectList()
+                .map(results -> {
+                    LocalDateTime endTime = LocalDateTime.now();
+                    long processingTime = Duration.between(startTime, endTime).toSeconds();
+
+                    // 반환되는 값 확인해보기 위해서
+                    Map<String, Object> resultMap = new HashMap<>();
+                    resultMap.put("status", "success");
+                    resultMap.put("message", "주차장 데이터 동기화 완료 (병렬 처리)");
+                    resultMap.put("totalCount", results.size());
+                    resultMap.put("successCount", successCount.get());
+                    resultMap.put("failCount", failCount.get());
+                    resultMap.put("processingTime", processingTime + "초");
+                    resultMap.put("timestamp", endTime);
+
+                    log.info("=== 병렬 처리 완료: {}초, 성공: {}, 실패: {} ===",
+                            processingTime, successCount.get(), failCount.get());
+
+                    return resultMap;
+                })
+                .doOnError(error -> log.error("동기화 중 에러 발생", error));
+    }
+
     @Transactional(readOnly = true)
     public List<ParkingLotDto> getAllParkingLots() {
         return parkingLotRepository.findAll().stream()
@@ -156,9 +178,6 @@ public class ParkingLotService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 주차장 코드로 조회
-     */
     @Transactional(readOnly = true)
     public ParkingLotDto getParkingLotByCode(String pkltCode) {
         ParkingLot parkingLot = parkingLotRepository.findById(pkltCode)
@@ -166,9 +185,6 @@ public class ParkingLotService {
         return ParkingLotDto.from(parkingLot);
     }
 
-    /**
-     * 주차장 이름으로 검색
-     */
     @Transactional(readOnly = true)
     public List<ParkingLotDto> searchParkingLots(String keyword) {
         List<ParkingLot> parkingLots;

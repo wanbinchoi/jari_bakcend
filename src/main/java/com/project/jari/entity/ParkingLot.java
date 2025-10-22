@@ -101,7 +101,7 @@ public class ParkingLot {
     private LocalDateTime updatedAt = LocalDateTime.now();
 
     // ===== 비즈니스 메서드 =====
-    
+
     /**
      * 정보 업데이트
      */
@@ -111,18 +111,6 @@ public class ParkingLot {
         this.totalCapacity = totalCapacity;
         this.updatedAt = LocalDateTime.now();
     }
-    
-    /**
-     * 위치 정보 업데이트
-     */
-    public void updateLocation(Double latitude, Double longitude) {
-        this.latitude = latitude;
-        this.longitude = longitude;
-        this.updatedAt = LocalDateTime.now();
-    }
 
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
 }
+

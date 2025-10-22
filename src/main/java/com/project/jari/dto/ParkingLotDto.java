@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
- * 주차장 DTO (단순화 버전)
+ * 주차장 DTO
  */
 @Data
 @NoArgsConstructor

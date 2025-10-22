@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
 import java.util.List;
@@ -65,37 +66,25 @@ public class ParkingLotController {
         return ResponseEntity.ok(parkingLots);
     }
 
-    /**
-     * 4. API 데이터 동기화 (관리자용)
-     * POST /api/parking-lots/sync
-     * 
-     * 서울시 Open API에서 데이터를 가져와 DB에 저장
-     * Kakao Map API로 주소를 좌표로 변환
-     */
-    @PostMapping("/sync")
-    public ResponseEntity<Map<String, Object>> syncParkingData() {
-        log.info("주차장 데이터 동기화 요청");
-        
-        try {
-            int count = parkingLotService.syncParkingData();
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "데이터 동기화 완료");
-            response.put("count", count);
-            
-            log.info("데이터 동기화 성공: {}건", count);
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            log.error("데이터 동기화 실패", e);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "데이터 동기화 실패: " + e.getMessage());
-            
-            return ResponseEntity.status(500).body(response);
-        }
+
+    // 4. 데이터 동기화 병렬처리
+    @PostMapping("/sync-parallel")
+    public Mono<ResponseEntity<Map<String, Object>>> syncParkingDataParallel() {
+        log.info("병렬 동기화 API 호출");
+
+        return parkingLotService.syncParkingDataParallel()
+                .map(result -> {
+                    log.info("병렬 동기화 API 응답 성공");
+                    return ResponseEntity.ok(result);
+                })
+                .onErrorResume(error -> {
+                    log.error("병렬 동기화 API 에러", error);
+                    return Mono.just(ResponseEntity.internalServerError()
+                            .body(Map.of(
+                                    "status", "error",
+                                    "message", error.getMessage()
+                            )));
+                });
     }
 
     /**

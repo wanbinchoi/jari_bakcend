@@ -95,19 +95,17 @@ public class ParkingApiClientImpl implements ParkingApiClient {
         try {
             // 1. API 호출하여 JSON 문자열 받기
             String jsonResponse = callPkApi();
-            
+
             // 2. JSON 문자열을 DTO로 파싱
             GetParkingInfo parkingInfo = objectMapper.readValue(jsonResponse, GetParkingInfo.class);
-            
+
             // 3. 파싱 결과 검증
             if (parkingInfo == null || parkingInfo.getGetParkingInfo() == null) {
                 log.error("API 응답 파싱 실패: parkingInfo가 null");
                 throw new IOException("API 응답 데이터가 올바르지 않습니다");
             }
             
-            int count = parkingInfo.getGetParkingInfo().getRow() != null 
-                ? parkingInfo.getGetParkingInfo().getRow().size() 
-                : 0;
+            int count = parkingInfo.getGetParkingInfo().getRow() != null ? parkingInfo.getGetParkingInfo().getRow().size() : 0;
             
             log.info("주차장 정보 조회 완료: {}건", count);
             
