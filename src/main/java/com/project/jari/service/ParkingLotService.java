@@ -260,4 +260,10 @@ public class ParkingLotService {
                 .map(ParkingLotDto::from)
                 .collect(Collectors.toList());
     }
+
+    /*
+    주소로도 검색하는 메소드를 만들었는데 service단에만 만들고
+    controller에 기능 구현해야함
+     */
+
 }
