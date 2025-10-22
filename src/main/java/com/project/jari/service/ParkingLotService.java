@@ -229,6 +229,7 @@ public class ParkingLotService {
         return ParkingLotDto.from(parkingLot);
     }
 
+    // 이름으로 검색하는거
     @Transactional(readOnly = true)
     public List<ParkingLotDto> searchParkingLots(String keyword) {
         List<ParkingLot> parkingLots;
@@ -237,6 +238,22 @@ public class ParkingLotService {
             parkingLots = parkingLotRepository.findAll();
         } else {
             parkingLots = parkingLotRepository.findByNameContaining(keyword);
+        }
+
+        return parkingLots.stream()
+                .map(ParkingLotDto::from)
+                .collect(Collectors.toList());
+    }
+
+    // 주소로 검색하는거
+    @Transactional(readOnly = true)
+    public List<ParkingLotDto> findByAddressContaining(String keyword) {
+        List<ParkingLot> parkingLots;
+
+        if (keyword == null || keyword.trim().isEmpty()) {
+            parkingLots = parkingLotRepository.findAll();
+        } else {
+            parkingLots = parkingLotRepository.findByAddressContaining(keyword);
         }
 
         return parkingLots.stream()

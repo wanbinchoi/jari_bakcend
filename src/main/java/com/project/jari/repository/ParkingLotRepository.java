@@ -13,4 +13,6 @@ public interface ParkingLotRepository extends JpaRepository<ParkingLot, String> 
 
     // 이름으로 검색
     List<ParkingLot> findByNameContaining(String name);
+    // 주소로 검색
+    List<ParkingLot> findByAddressContaining(String address);
 }
