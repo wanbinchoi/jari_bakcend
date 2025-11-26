@@ -3,7 +3,7 @@ package com.project.jari.client.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.jari.client.ParkingApiClient;
 import com.project.jari.config.SeoulApiProperties;
-import com.project.jari.dto.response.GetParkingInfo;
+import com.project.jari.dto.parkingLot.GetParkingInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

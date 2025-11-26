@@ -1,6 +1,6 @@
-package com.project.jari.repository;
+package com.project.jari.repository.parkingLot;
 
-import com.project.jari.entity.ParkingLot;
+import com.project.jari.entity.parkingLot.ParkingLot;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

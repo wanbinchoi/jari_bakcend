@@ -1,13 +1,12 @@
-package com.project.jari.service;
+package com.project.jari.service.parkingLot;
 
 import com.project.jari.client.KakaoMapApiClient;
 import com.project.jari.client.ParkingApiClient;
 import com.project.jari.dto.ParkingLotDto;
-import com.project.jari.dto.response.ApiResponse;
-import com.project.jari.dto.response.ParkingLotInfo;
-import com.project.jari.entity.ParkingLot;
+import com.project.jari.dto.parkingLot.ParkingLotInfo;
+import com.project.jari.entity.parkingLot.ParkingLot;
 import com.project.jari.exception.ParkingLotNotFoundException;
-import com.project.jari.repository.ParkingLotRepository;
+import com.project.jari.repository.parkingLot.ParkingLotRepository;
 import com.project.jari.util.AddressCleanser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +17,6 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

@@ -1,6 +1,6 @@
 package com.project.jari.exception;
 
-import com.project.jari.dto.response.ApiResponse;
+import com.project.jari.dto.api.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;

@@ -1,7 +1,7 @@
-package com.project.jari.controller;
+package com.project.jari.controller.parkingLot;
 
 import com.project.jari.dto.mapping.AddressMapping;
-import com.project.jari.service.AddressMappingService;
+import com.project.jari.service.parkingLot.AddressMappingService;
 import com.project.jari.util.AddressCleanser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

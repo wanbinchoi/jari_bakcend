@@ -1,8 +1,8 @@
-package com.project.jari.controller;
+package com.project.jari.controller.parkingLot;
 
 import com.project.jari.dto.ParkingLotDto;
-import com.project.jari.dto.response.ApiResponse;
-import com.project.jari.service.ParkingLotService;
+import com.project.jari.dto.api.ApiResponse;
+import com.project.jari.service.parkingLot.ParkingLotService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;

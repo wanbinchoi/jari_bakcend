@@ -1,8 +1,8 @@
-package com.project.jari.controller;
+package com.project.jari.controller.join;
 
 
 import com.project.jari.dto.join.MemberJoinRequest;
-import com.project.jari.service.MemberService;
+import com.project.jari.service.join.MemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

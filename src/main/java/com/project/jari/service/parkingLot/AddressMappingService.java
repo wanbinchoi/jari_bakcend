@@ -1,4 +1,4 @@
-package com.project.jari.service;
+package com.project.jari.service.parkingLot;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.jari.dto.mapping.AddressMapping;

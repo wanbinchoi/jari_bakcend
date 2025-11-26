@@ -1,6 +1,6 @@
 package com.project.jari.dto;
 
-import com.project.jari.entity.ParkingLot;
+import com.project.jari.entity.parkingLot.ParkingLot;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

@@ -1,7 +1,7 @@
 package com.project.jari.client.impl;
 
 import com.project.jari.config.KakaoMapProperties;
-import com.project.jari.dto.response.KakaoAddressResponse;
+import com.project.jari.dto.parkingLot.KakaoAddressResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;

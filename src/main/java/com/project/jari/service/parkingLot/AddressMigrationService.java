@@ -1,7 +1,7 @@
-package com.project.jari.service;
+package com.project.jari.service.parkingLot;
 
-import com.project.jari.entity.ParkingLot;
-import com.project.jari.repository.ParkingLotRepository;
+import com.project.jari.entity.parkingLot.ParkingLot;
+import com.project.jari.repository.parkingLot.ParkingLotRepository;
 import com.project.jari.util.AddressCleanser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

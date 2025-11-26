@@ -1,6 +1,6 @@
 package com.project.jari.util;
 
-import com.project.jari.service.AddressMappingService;
+import com.project.jari.service.parkingLot.AddressMappingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

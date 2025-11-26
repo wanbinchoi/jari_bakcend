@@ -1,5 +1,7 @@
-package com.project.jari.entity;
+package com.project.jari.entity.review;
 
+import com.project.jari.entity.join.Member;
+import com.project.jari.entity.parkingLot.ParkingLot;
 import jakarta.persistence.*;
 import lombok.*;
 

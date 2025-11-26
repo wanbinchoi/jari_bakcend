@@ -1,4 +1,4 @@
-package com.project.jari.entity;
+package com.project.jari.entity.join;
 
 import jakarta.persistence.*;
 import lombok.*;

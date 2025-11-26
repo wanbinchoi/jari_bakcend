@@ -1,6 +1,7 @@
-package com.project.jari.dto.response;
+package com.project.jari.dto.parkingLot;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.project.jari.dto.api.ApiResult;
 import lombok.Data;
 
 import java.util.List;

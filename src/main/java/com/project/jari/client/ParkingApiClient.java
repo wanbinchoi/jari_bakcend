@@ -1,6 +1,6 @@
 package com.project.jari.client;
 
-import com.project.jari.dto.response.GetParkingInfo;
+import com.project.jari.dto.parkingLot.GetParkingInfo;
 
 import java.io.IOException;
 

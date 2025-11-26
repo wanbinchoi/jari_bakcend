@@ -1,4 +1,4 @@
-package com.project.jari.entity;
+package com.project.jari.entity.parkingLot;
 
 import jakarta.persistence.*;
 import lombok.*;

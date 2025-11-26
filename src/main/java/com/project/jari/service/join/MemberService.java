@@ -1,8 +1,8 @@
-package com.project.jari.service;
+package com.project.jari.service.join;
 
 import com.project.jari.dto.join.MemberJoinRequest;
-import com.project.jari.entity.Member;
-import com.project.jari.repository.MemberRepository;
+import com.project.jari.entity.join.Member;
+import com.project.jari.repository.join.MemberRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
