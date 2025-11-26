@@ -1,6 +1,7 @@
 package com.project.jari.service.join;
 
 import com.project.jari.dto.join.MemberJoinRequest;
+import com.project.jari.dto.login.LoginRequestDto;
 import com.project.jari.entity.join.Member;
 import com.project.jari.repository.join.MemberRepository;
 import jakarta.transaction.Transactional;
@@ -15,6 +16,7 @@ public class MemberService {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
 
+    //회원가입
     @Transactional
     public void join(MemberJoinRequest req){
 
@@ -37,4 +39,16 @@ public class MemberService {
         // 4. DB 저장
         memberRepository.save(member);
     }
+    public Member login(LoginRequestDto req){
+        // 1. 아이디로 회원 조회
+        Member member = memberRepository.findByMbId(req.getMbId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 아이디입니다."));
+
+        // 2. 비밀번호 확인
+        if(!passwordEncoder.matches(req.getMbPwd(), member.getMbPwd())){
+            throw new IllegalArgumentException(("비밀번호가 일치하지 않습니다."));
+        }
+        return member;
+    }
+
 }
