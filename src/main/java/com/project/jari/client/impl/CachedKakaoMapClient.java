@@ -42,7 +42,7 @@ public class CachedKakaoMapClient {
             unless = "#result == null || #result.length == 0"  // null값 지정
     )
     public Double[] getCoordinatesWithCache(String address) {
-        log.info("🔍 캐시 미스 - API 호출: {}", address);
+        log.info("캐시 미스 - API 호출: {}", address);
 
         // 실제 Kakao API 호출
         // 해서 캐시에 값 저장
@@ -81,7 +81,7 @@ public class CachedKakaoMapClient {
             return new Double[]{DEFAULT_LAT, DEFAULT_LNG};
 
         } catch (Exception e) {
-            log.error("❌ API 호출 중 에러 발생: {}", address, e);
+            log.error("API 호출 중 에러 발생: {}", address, e);
             return new Double[]{DEFAULT_LAT, DEFAULT_LNG};
         }
     }
