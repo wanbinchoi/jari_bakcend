@@ -14,8 +14,9 @@ import java.time.LocalDateTime;
 public class Ratings {
 
     @Id
-    @Column(name = "ra_code", length = 20)
-    private String raCode;
+    @Column(name = "ra_code")
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long raCode;
 
     @ManyToOne
     @JoinColumn(name = "mb_code")

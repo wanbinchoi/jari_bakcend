@@ -17,14 +17,12 @@ java {
 repositories {
 	mavenCentral()
 }
-
 dependencies {
 
 	implementation 'org.springframework.boot:spring-boot-starter'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 
-	// Spring Security (아직 사용 안함)
-	//implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
 
 	// MySQL
 	implementation 'mysql:mysql-connector-java:8.0.33'
@@ -58,6 +56,7 @@ dependencies {
 
 
 }
+
 
 tasks.named('test') {
 	useJUnitPlatform()
