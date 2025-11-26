@@ -17,8 +17,8 @@ public class KakaoMapApiClientImpl implements KakaoMapApiClient {
 
     private final CachedKakaoMapClient cachedKakaoMapClient;
 
-    private static final Double DEFAULT_LAT = 37.5665;
-    private static final Double DEFAULT_LNG = 126.9780;
+//    private static final Double DEFAULT_LAT = 37.5665;
+//    private static final Double DEFAULT_LNG = 126.9780;
 
     /**
      * 동기 방식 주소 변환 (캐싱 적용됨)
@@ -35,10 +35,13 @@ public class KakaoMapApiClientImpl implements KakaoMapApiClient {
     public Mono<Double[]> convertAddressToCoordinatesAsync(String address) {
         return Mono.fromCallable(() ->
                         cachedKakaoMapClient.getCoordinatesWithCache(address)
-                )
-                .onErrorResume(error -> {
-                    log.error("주소 변환 실패: {}", address, error);
-                    return Mono.just(new Double[]{DEFAULT_LAT, DEFAULT_LNG});
-                });
+                // 이거 위에 고정값 없애서 없애도 되는거임
+                // resources에 failed-address-mapping.json으로 만들어서 해결
+//                )
+//                .onErrorResume(error -> {
+//                    log.error("주소 변환 실패: {}", address, error);
+//                    return Mono.just(new Double[]{DEFAULT_LAT, DEFAULT_LNG});
+//                }
+                );
     }
 }
