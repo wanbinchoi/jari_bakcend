@@ -29,8 +29,9 @@ public class ParkingLotDto {
     private Double latitude;
     private Double longitude;
     
-    // 주차 용량
+    // 주차 정보
     private Integer totalCapacity;
+    private Integer nowVhclCnt;
     
     // 요금 정보
     private Boolean isPaid;
@@ -64,6 +65,7 @@ public class ParkingLotDto {
                 .latitude(entity.getLatitude())
                 .longitude(entity.getLongitude())
                 .totalCapacity(entity.getTotalCapacity())
+                .nowVhclCnt(entity.getNowVhclCnt())
                 .isPaid(entity.getIsPaid())
                 .baseRate(entity.getBaseRate())
                 .baseTime(entity.getBaseTime())
