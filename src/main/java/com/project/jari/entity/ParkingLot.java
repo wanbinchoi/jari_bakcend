@@ -48,10 +48,14 @@ public class ParkingLot {
     @Column(name = "longitude", precision = 11, nullable = false)
     private Double longitude;
 
-    // ===== 주차 용량 =====
+    // ===== 주차 정보 =====
     @Column(name = "total_capacity")
     @Builder.Default
     private Integer totalCapacity = 0;
+
+    @Column(name = "now_vhcl_cnt")
+    @Builder.Default
+    private Integer nowVhclCnt = 0;
 
     // ===== 요금 정보 =====
     @Column(name = "is_paid")

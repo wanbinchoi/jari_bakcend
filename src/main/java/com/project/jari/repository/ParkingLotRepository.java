@@ -2,6 +2,8 @@ package com.project.jari.repository;
 
 import com.project.jari.entity.ParkingLot;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,4 +16,9 @@ public interface ParkingLotRepository extends JpaRepository<ParkingLot, String> 
     List<ParkingLot> findByNameContaining(String name);
     // 주소로 검색
     List<ParkingLot> findByAddressContaining(String address);
+
+    // @Query 사용해서
+    @Query("SELECT p FROM ParkingLot p WHERE " +
+            "p.name LIKE %:keyword% OR p.address LIKE %:keyword%")
+    List<ParkingLot> searchByKeyword(@Param("keyword") String keyword);
 }

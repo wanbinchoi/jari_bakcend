@@ -3,8 +3,10 @@ package com.project.jari.service;
 import com.project.jari.client.KakaoMapApiClient;
 import com.project.jari.client.ParkingApiClient;
 import com.project.jari.dto.ParkingLotDto;
+import com.project.jari.dto.response.ApiResponse;
 import com.project.jari.dto.response.ParkingLotInfo;
 import com.project.jari.entity.ParkingLot;
+import com.project.jari.exception.ParkingLotNotFoundException;
 import com.project.jari.repository.ParkingLotRepository;
 import com.project.jari.util.AddressCleanser;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,9 +35,8 @@ public class ParkingLotService {
     private final KakaoMapApiClient kakaoMapApiClient;
     private final AddressCleanser addressCleanser;
 
-    // 서울시청 좌표 (폴백용)
-    private static final double DEFAULT_LATITUDE = 37.5665;
-    private static final double DEFAULT_LONGITUDE = 126.9780;
+    // 죄표값 0으로 초기화
+    private static final double DEFAULT_COORDINATE = 0.0;
 
     /**
      * ParkingLotInfo를 ParkingLot Entity로 변환
@@ -72,6 +74,7 @@ public class ParkingLotService {
                 .latitude(latitude)
                 .longitude(longitude)
                 .totalCapacity(info.getTPKCT() != null ? info.getTPKCT().intValue() : 0)
+                .nowVhclCnt(info.getNOW_PRK_VHCL_CNT() != null ? info.getNOW_PRK_VHCL_CNT().intValue() : 0)
                 .isPaid("Y".equals(info.getPAY_YN()))
                 .baseRate(info.getBSC_PRK_CRG() != null ? info.getBSC_PRK_CRG().intValue() : 0)
                 .baseTime(info.getBSC_PRK_HR() != null ? info.getBSC_PRK_HR().intValue() : 0)
@@ -85,7 +88,7 @@ public class ParkingLotService {
     }
 
     /**
-     * 개별 주차장 처리 (비동기) - 매핑 시스템 통합
+     * 개별 주차장 처리
      * 
      * 처리 순서:
      * 1. 매핑 테이블에서 좌표 확인
@@ -93,8 +96,9 @@ public class ParkingLotService {
      * 3. 모든 방법 실패 시 기본 좌표 사용
      * 
      * 면접 포인트:
-     * - "다단계 fallback 전략을 구현하여 데이터 손실을 최소화했습니다"
-     * - "매핑 테이블을 우선 확인하여 API 호출 비용을 절약했습니다"
+     * - 다단계 fallback 전략을 구현하여 데이터 손실을 최소화
+     * - 카카오 api로 변환되지 않는 주소는 개발자측에서 미리 파악 후 매핑테이블 작성
+     * - 매핑 테이블을 우선 확인하여 API 호출 비용을 절약
      */
     private Mono<ParkingLot> processParkingLotAsync(
             ParkingLotInfo info,
@@ -129,17 +133,11 @@ public class ParkingLotService {
                                     ParkingLot saved = parkingLotRepository.save(parkingLot);
                                     successCount.incrementAndGet();
                                     
-                                    log.debug("✅ 카카오 API 성공: {} (주소: {})",
-                                            info.getPKLT_NM(), cleansedAddress);
-                                    
                                     return saved;
                                 })
                                 .onErrorResume(apiError -> {
                                     // 카카오 API도 실패 -> 기본 좌표 사용
-                                    log.warn("❌ 카카오 API 실패, 기본 좌표 사용: {} (주소: {})",
-                                            info.getPKLT_NM(), cleansedAddress);
-                                    
-                                    ParkingLot parkingLot = convertToEntity(info, DEFAULT_LATITUDE, DEFAULT_LONGITUDE);
+                                    ParkingLot parkingLot = convertToEntity(info, DEFAULT_COORDINATE, DEFAULT_COORDINATE);
                                     ParkingLot saved = parkingLotRepository.save(parkingLot);
                                     failCount.incrementAndGet();
                                     
@@ -152,7 +150,7 @@ public class ParkingLotService {
                     log.error("❌ 전체 처리 실패: {} (주소: {})", 
                             info.getPKLT_NM(), rawAddress, error);
                     
-                    ParkingLot parkingLot = convertToEntity(info, DEFAULT_LATITUDE, DEFAULT_LONGITUDE);
+                    ParkingLot parkingLot = convertToEntity(info, DEFAULT_COORDINATE, DEFAULT_COORDINATE);
                     ParkingLot saved = parkingLotRepository.save(parkingLot);
                     failCount.incrementAndGet();
                     
@@ -165,9 +163,9 @@ public class ParkingLotService {
      * 병렬 주차장 데이터 동기화 (매핑 시스템 포함)
      * 
      * 면접 포인트:
-     * - "매핑 테이블 활용으로 API 호출 비용을 줄이고 처리 속도를 향상했습니다"
-     * - "병렬 처리로 대용량 데이터를 효율적으로 처리했습니다"
-     * - "상세한 통계 정보로 시스템 성능을 모니터링할 수 있습니다"
+     * - 매핑 테이블 활용으로 API 호출 비용을 줄이고 처리 속도를 향상
+     * - 병렬 처리로 대용량 데이터를 효율적으로 처리
+     * - 상세한 통계 정보로 시스템 성능을 모니터링 가능
      */
     @Transactional
     public Mono<Map<String, Object>> syncParkingDataParallel() {
@@ -222,6 +220,7 @@ public class ParkingLotService {
                 .collect(Collectors.toList());
     }
 
+
     @Transactional(readOnly = true)
     public ParkingLotDto getParkingLotByCode(String pkltCode) {
         ParkingLot parkingLot = parkingLotRepository.findById(pkltCode)
@@ -229,41 +228,82 @@ public class ParkingLotService {
         return ParkingLotDto.from(parkingLot);
     }
 
-    // 이름으로 검색하는거
-    @Transactional(readOnly = true)
-    public List<ParkingLotDto> searchParkingLots(String keyword) {
-        List<ParkingLot> parkingLots;
-
-        if (keyword == null || keyword.trim().isEmpty()) {
-            parkingLots = parkingLotRepository.findAll();
-        } else {
-            parkingLots = parkingLotRepository.findByNameContaining(keyword);
-        }
-
-        return parkingLots.stream()
-                .map(ParkingLotDto::from)
-                .collect(Collectors.toList());
-    }
-
-    // 주소로 검색하는거
-    @Transactional(readOnly = true)
-    public List<ParkingLotDto> findByAddressContaining(String keyword) {
-        List<ParkingLot> parkingLots;
-
-        if (keyword == null || keyword.trim().isEmpty()) {
-            parkingLots = parkingLotRepository.findAll();
-        } else {
-            parkingLots = parkingLotRepository.findByAddressContaining(keyword);
-        }
-
-        return parkingLots.stream()
-                .map(ParkingLotDto::from)
-                .collect(Collectors.toList());
-    }
+    /**
+    1. 이름, 주소 각각 검색하는 기능 구현했음
+    2. 검색창에 구분해서 검색하는 기능을 만들까 했으나
+       공통 검색하는 기능으로 리팩토링(추가하는 형식으로)
+    3. ParkingLotRepository에 @Query로 직접 쿼리문으로 공통 검색 메소드 생성
+    4. 구현
+     @param keyword -> 검색할 키워드(String)
+     **/
 
     /*
-    주소로도 검색하는 메소드를 만들었는데 service단에만 만들고
-    controller에 기능 구현해야함
+     * 통합 검색 (이름 + 주소)
      */
+    public List<ParkingLotDto> searchByKeyword(String keyword) {
 
+        // 1. 검색어 유효성 검사
+        if (keyword == null || keyword.trim().isEmpty()) {
+            throw new IllegalArgumentException("검색어를 입력해주세요.");
+        }
+
+        // 2. DB에서 한 번에 조회 (이름 OR 주소)
+        List<ParkingLot> parkingLots = parkingLotRepository.searchByKeyword(keyword);
+
+        // 3. 결과 검증
+        if (parkingLots.isEmpty()) {
+            throw new ParkingLotNotFoundException(
+                    "'" + keyword + "' 검색 결과가 존재하지 않습니다."
+            );
+        }
+
+        // 4. DTO 변환 후 반환
+        return parkingLots.stream()
+                .map(ParkingLotDto::from)
+                .collect(Collectors.toList());
+    }
+
+    // 주차장 이름으로 검색
+    @Transactional(readOnly = true)
+    public List<ParkingLotDto> searchNameContaining(String name) {
+        // 1. 검색어가 없으면 예외 발생
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("검색어를 입력해주세요.");
+        }
+
+        // 2. DB 조회
+        List<ParkingLot> parkingLots = parkingLotRepository.findByNameContaining(name);
+
+        // 3. 결과가 없으면 예외 발생
+        if (parkingLots.isEmpty()) {
+            throw new ParkingLotNotFoundException("'" + name + "' 검색 결과가 존재하지 않습니다.");
+        }
+
+        // 4. 결과가 있으면 DTO로 변환해서 반환
+        return parkingLots.stream()
+                .map(ParkingLotDto::from)
+                .collect(Collectors.toList());
+    }
+
+    // 주소로 검색
+    @Transactional(readOnly = true)
+    public List<ParkingLotDto> findByAddressContaining(String address) {
+        // 1. 검색어가 없으면 예외 발생
+        if (address == null || address.trim().isEmpty()) {
+            throw new IllegalArgumentException("검색어를 입력해주세요.");
+        }
+
+        // 2. DB 조회
+        List<ParkingLot> parkingLots = parkingLotRepository.findByAddressContaining(address);
+
+        // 3. 결과가 없으면 예외 발생
+        if (parkingLots.isEmpty()) {
+            throw new ParkingLotNotFoundException("'" + address + "' 검색 결과가 존재하지 않습니다.");
+        }
+
+        // 4. 결과가 있으면 DTO로 변환해서 반환
+        return parkingLots.stream()
+                .map(ParkingLotDto::from)
+                .collect(Collectors.toList());
+    }
 }
