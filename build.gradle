@@ -18,10 +18,8 @@ repositories {
 	mavenCentral()
 }
 dependencies {
-	// 기본 Spring Boot
-	implementation 'org.springframework.boot:spring-boot-starter'
 
-	// Spring Web (REST API 포함)
+	implementation 'org.springframework.boot:spring-boot-starter'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 
 	implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -49,7 +47,7 @@ dependencies {
 	// Spring Cache
 	implementation 'org.springframework.boot:spring-boot-starter-cache'
 
-	// Caffeine 캐시 구현체
+	// Caffeine Cache 구현체
 	implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
 
 	// 테스트
