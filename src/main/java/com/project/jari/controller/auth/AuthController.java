@@ -1,6 +1,7 @@
 package com.project.jari.controller.auth;
 
 import com.project.jari.dto.login.LoginRequestDto;
+import com.project.jari.dto.login.LoginResponseDto;
 import com.project.jari.entity.join.Member;
 import com.project.jari.service.join.MemberService;
 import lombok.RequiredArgsConstructor;
@@ -18,12 +19,12 @@ public class AuthController {
     private final MemberService memberService;
 
     @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody LoginRequestDto req){
+    public ResponseEntity<LoginResponseDto> login(@RequestBody LoginRequestDto req){
         try{
-            Member member = memberService.login(req);
-            return ResponseEntity.ok("로그인 성공: " + member.getMbId());
+            LoginResponseDto res = memberService.login(req);
+            return ResponseEntity.ok(res);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(null);
         }
     }
 }

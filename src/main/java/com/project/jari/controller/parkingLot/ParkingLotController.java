@@ -17,7 +17,7 @@ import java.util.Map;
  * 주차장 정보 관리 Controller
  */
 @RestController
-@RequestMapping("/parking-lots")
+@RequestMapping("/api/parking-lots")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 @Slf4j
