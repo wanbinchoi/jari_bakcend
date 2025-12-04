@@ -39,6 +39,7 @@ public class JwtTokenProvider {
     }
 
     // Refresh Token 생성
+    // 실제 사용할때는 DB에 저장하고 사용
     public String createRefreshToken(String mbId) {
         Date now = new Date();
         Date expireDate = new Date(now.getTime() + refreshTokenExpiration);

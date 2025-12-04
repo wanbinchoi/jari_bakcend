@@ -42,7 +42,7 @@ public class AddressCleanser {
         // 2차: 매핑 테이블에서 도로명 주소 확인
         Optional<String> roadNameAddress = addressMappingService.findRoadNameAddress(rawAddress);
         if (roadNameAddress.isPresent()) {
-            log.info("🗂️ 매핑 테이블에서 도로명 주소 발견: '{}' -> '{}'", 
+            log.info("매핑 테이블에서 도로명 주소 발견: '{}' -> '{}'",
                 rawAddress, roadNameAddress.get());
             return roadNameAddress.get();
         }

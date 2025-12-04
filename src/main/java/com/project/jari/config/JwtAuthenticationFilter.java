@@ -15,6 +15,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+/*
+ * 모든 HTTP 요청마다 JWT를 검증하고
+ * 인증 정보를 Spring Security에 등록
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -41,6 +45,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             System.out.println("추출된 userId: " + userId);  // ← 로그 추가
 
             // 4. 인증 객체 생성
+            // security context에 저장함
+            // 이후 모든 컨트롤러에서 인증된 사용자로 인식
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(
                             userId,        // principal: 사용자 ID
